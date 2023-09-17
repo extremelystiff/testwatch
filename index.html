@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -6,11 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GitHub P2P Video Room</title>
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/3.0.10/controls.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/3.0.10/shaka-player.compiled.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/p2p-media-loader-shaka@latest/build/p2p-media-loader-shaka.min.js"></script>
     <style>
-        #player {
+        #video {
             width: 70%;
             height: 400px;
             margin: 20px auto;
@@ -19,7 +19,7 @@
 </head>
 
 <body>
-    <div id="player"></div>
+    <video id="video" controls></video>
     <div style="text-align: center;">
         <input type="text" id="videoUrl" placeholder="Enter video URL or browse..." size="50">
         <input type="file" id="fileInput">
@@ -27,29 +27,18 @@
     </div>
 
     <script>
-        var engine = new p2pml.hlsjs.Engine();
-        var player;
+        shaka.polyfill.installAll();
 
-        function initializePlayer(sourceUrl) {
-            player = new Clappr.Player({
-                parentId: "#player",
-                source: sourceUrl,
-                mute: true,
-                autoPlay: true,
-                playback: {
-                    hlsjsConfig: {
-                        liveSyncDurationCount: 7,
-                        loader: engine.createLoaderClass()
-                    }
-                }
-            });
-            p2pml.hlsjs.initClapprPlayer(player);
-        }
+        var player = new shaka.Player(document.getElementById('video'));
+        var engine = new p2pml.shaka.Loader();
+
+        player.getNetworkingEngine().registerScheme('https', engine.loadSegment.bind(engine));
+        player.getNetworkingEngine().registerScheme('http', engine.loadSegment.bind(engine));
 
         function loadVideo() {
             let url = document.getElementById('videoUrl').value;
             if (url) {
-                initializePlayer(url);
+                player.load(url);
             }
         }
 
@@ -58,12 +47,12 @@
             if (file) {
                 let objectUrl = URL.createObjectURL(file);
                 document.getElementById('videoUrl').value = objectUrl;
-                initializePlayer(objectUrl);
+                player.load(objectUrl);
             }
         });
 
         // Load default video for example
-        initializePlayer("https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8");
+        player.load("https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8");
     </script>
 </body>
 
