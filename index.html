@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Sync</title>
+    <link href="https://vjs.zencdn.net/7.8.4/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/7.8.4/video.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <!-- HTML for creating/joining a lobby -->
+    <div id="lobby">
+        <input type="text" id="username" placeholder="Username">
+        <button onclick="createLobby()">Create Lobby</button>
+        <input type="text" id="lobbyCode" placeholder="Lobby Code">
+        <button onclick="joinLobby()">Join Lobby</button>
+    </div>
+
+    <!-- HTML for video player -->
+    <div id="player" style="display:none;">
+        <video id="my-video" class="video-js" controls preload="auto" width="640" height="264">
+        </video>
+        <input type="text" id="videoURL" placeholder="Video URL">
+        <button onclick="setVideo()">Set Video</button>
+    </div>
+
+    <script>
+const socket = io.connect('http://localhost:3000');
+
+let lobbyCodeGlobal = '';
+const player = videojs('my-video');
+
+// Functions
+function createLobby() {
+    const username = document.getElementById('username').value;
+    if (username) {
+        socket.emit('create', username, (lobbyCode) => {
+            if (lobbyCode) {
+                lobbyCodeGlobal = lobbyCode;
+                alert(`Lobby created! Share this code: ${lobbyCode}`);
+                switchToPlayer();
+            } else {
+                alert('Error creating lobby');
+            }
+        });
+    } else {
+        alert('Please enter a username');
+    }
+}
+
+function joinLobby() {
+    const username = document.getElementById('username').value;
+    const lobbyCode = document.getElementById('lobbyCode').value;
+    if (username && lobbyCode) {
+        socket.emit('join', lobbyCode, username, (success) => {
+            if (success) {
+                lobbyCodeGlobal = lobbyCode;
+                alert('Joined lobby!');
+                switchToPlayer();
+            } else {
+                alert('Invalid lobby code or other error');
+            }
+        });
+    } else {
+        alert('Please enter a username and lobby code');
+    }
+}
+
+function setVideo() {
+    const url = document.getElementById('videoURL').value;
+    if (url) {
+        socket.emit('setVideo', lobbyCodeGlobal, url);
+        player.src({ type: 'video/mp4', src: url });
+    } else {
+        alert('Please enter a video URL');
+    }
+}
+
+function switchToPlayer() {
+    document.getElementById('lobby').style.display = 'none';
+    document.getElementById('player').style.display = 'block';
+}
+
+// Socket events
+socket.on('sync', (videoState) => {
+    if (videoState.url !== player.currentSrc()) {
+        player.src({ type: 'video/mp4', src: videoState.url });
+    }
+    if (videoState.state === 'play' && player.paused()) {
+        player.play();
+    } else if (videoState.state === 'pause' && !player.paused()) {
+        player.pause();
+    }
+    // Syncing video time
+    if (Math.abs(player.currentTime() - videoState.time) > 1) {
+        player.currentTime(videoState.time);
+    }
+});
+
+player.on('play', () => {
+    socket.emit('sync', lobbyCodeGlobal, { state: 'play', time: player.currentTime() });
+});
+
+player.on('pause', () => {
+    socket.emit('sync', lobbyCodeGlobal, { state: 'pause', time: player.currentTime() });
+});
+
+player.on('seeked', () => {
+    socket.emit('sync', lobbyCodeGlobal, { state: player.paused() ? 'pause' : 'play', time: player.currentTime() });
+});
+
+    </script>
+</body>
+</html>
