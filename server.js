@@ -30,12 +30,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('sync', (lobbyCode) => {
+    socket.on('sync', (lobbyCode, videoState) => {
         const lobby = lobbies[lobbyCode];
         if (lobby && lobby.host === socket.id) {
-            io.to(lobbyCode).emit('sync', lobby.video);
+            lobby.video = videoState;
+            // Emit to everyone except the sender to synchronize the video state.
+            socket.to(lobbyCode).emit('sync', lobby.video);
         }
     });
+
 
     socket.on('setVideo', (lobbyCode, url) => {
         const lobby = lobbies[lobbyCode];
